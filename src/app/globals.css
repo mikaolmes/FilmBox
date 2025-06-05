@@ -1,0 +1,398 @@
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  margin: 0;
+  font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: linear-gradient(135deg, #6e45e2 0%, #88d3ce 100%); /* Updated Gradient */
+  background-attachment: fixed;
+  color: #fff;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  padding: 20px;
+  box-sizing: border-box;
+  overflow-x: hidden;
+}
+
+main {
+  width: 100%;
+  max-width: 420px; /* Adjusted max-width for a more compact look like the image */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.app-container {
+  width: 100%;
+  text-align: center;
+  animation: fadeIn 0.8s ease;
+  background: rgba(255, 255, 255, 0.1); /* Slightly more transparent */
+  backdrop-filter: blur(15px); /* Increased blur */
+  -webkit-backdrop-filter: blur(15px);
+  border-radius: 30px; /* More rounded corners */
+  padding: 30px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25); /* Softer, more spread shadow */
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+h1 {
+  margin-bottom: 25px; /* Adjusted margin */
+  font-size: 2.5rem; /* Adjusted font size */
+  font-weight: 700;
+  text-shadow: 0 2px 8px rgba(0,0,0,0.25);
+  letter-spacing: -0.5px;
+  display: flex; /* For icon alignment */
+  align-items: center; /* For icon alignment */
+  justify-content: center; /* For icon alignment */
+}
+
+/* Added style for an icon next to h1 if you add one, like in the image */
+h1 svg {
+  margin-right: 12px;
+  width: 32px; /* Adjust size as needed */
+  height: 32px; /* Adjust size as needed */
+}
+
+.progress-bar {
+  background: rgba(255,255,255,0.1);
+  height: 20px; /* Made taller like in the image */
+  border-radius: 10px;
+  margin-bottom: 20px;
+  overflow: hidden;
+  box-shadow: inset 0 1px 3px rgba(0,0,0,0.15);
+  padding: 4px; /* Padding to make the inner bar look inset */
+}
+
+.progress {
+  background: #6dd5ed; /* Greenish-blue progress, can be adjusted */
+  height: 100%;
+  border-radius: 6px; /* Rounded inner bar */
+  transition: width 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+  width: 0%;
+  box-shadow: none; /* Removed previous shadow, new design is flatter */
+}
+
+.card-container {
+  position: relative;
+  height: auto; /* Allow height to adjust to content */
+  min-height: 380px; /* Minimum height for the card area */
+  margin-bottom: 25px;
+  width: 100%;
+}
+
+.movie-card {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  background: rgba(255,255,255,0.12); /* Slightly more transparent */
+  backdrop-filter: blur(18px); /* Increased blur for card */
+  -webkit-backdrop-filter: blur(18px);
+  border: 1px solid rgba(255,255,255,0.18);
+  border-radius: 24px;
+  padding: 25px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.22);
+  transition: all 0.3s ease;
+  overflow: hidden; /* Hide overflow for cleaner look */
+  left: 50%;
+  transform: translateX(-50%);
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center; /* Center content */
+}
+
+.movie-card.active {
+  animation: slideIn 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) scale(1);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.movie-poster {
+  width: 120px; /* Adjusted size */
+  height: 180px; /* Adjusted size */
+  background: rgba(0,0,0, 0.2); /* Darker, semi-transparent background for poster */
+  border-radius: 16px;
+  margin: 0 auto 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 3.5rem; /* Adjusted emoji/icon size */
+  color: #fff;
+  box-shadow: 0 8px 16px rgba(0,0,0,0.15);
+  transition: transform 0.3s ease;
+  overflow: hidden; /* Ensure image fits */
+}
+
+.movie-poster img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover; /* Ensure image covers the area */
+}
+
+.movie-poster:hover {
+  transform: scale(1.03);
+}
+
+.movie-content h2 {
+  margin: 0 0 8px 0;
+  font-size: 1.6rem; /* Adjusted font size */
+  font-weight: 600;
+  letter-spacing: -0.25px;
+}
+
+.movie-meta {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 20px;
+  font-size: 0.95rem;
+  opacity: 0.9;
+}
+
+.genre {
+  background: rgba(255,255,255,0.1);
+  padding: 5px 12px;
+  border-radius: 15px;
+  font-weight: 500;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  transition: all 0.2s ease;
+  font-size: 0.8rem; /* Smaller genre tags */
+}
+
+.genre:hover {
+  background: rgba(255,255,255,0.25);
+  transform: translateY(-2px);
+}
+
+.description {
+  margin-top: 20px;
+  line-height: 1.7;
+  font-size: 1.05rem;
+  transition: max-height 0.5s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+  max-height: 0;
+  opacity: 0;
+  overflow: hidden;
+}
+
+.description.visible {
+  max-height: 300px;
+  opacity: 1;
+}
+
+.button-container {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+  margin-bottom: 20px;
+  width: 100%;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+button {
+  background: rgba(255,255,255,0.1);
+  color: white;
+  border: none;
+  padding: 14px 20px; /* Adjusted padding */
+  font-size: 1rem; /* Adjusted font size */
+  font-weight: 500;
+  border-radius: 15px; /* Less rounded buttons */
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255,255,255,0.15);
+  flex: 1; /* Allow buttons to take equal space */
+  min-height: 50px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 3px 8px rgba(0,0,0,0.1);
+}
+
+button:hover {
+  background: rgba(255,255,255,0.2);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 15px rgba(0,0,0,0.12);
+}
+
+button:active {
+  transform: translateY(0px);
+  box-shadow: 0 3px 6px rgba(0,0,0,0.15);
+}
+
+.btn-dislike {
+  background: rgba(255, 82, 82, 0.6); /* Reddish, more opaque */
+  border: 1px solid rgba(255, 82, 82, 0.7);
+}
+
+.btn-dislike:hover {
+  background: rgba(255, 82, 82, 0.7);
+  border: 1px solid rgba(255, 82, 82, 0.8);
+}
+
+/* Info button specific style if needed, image shows it as more neutral */
+#show-description {
+    background: rgba(100, 100, 200, 0.5); /* Bluish, more opaque */
+    border: 1px solid rgba(100, 100, 200, 0.6);
+}
+
+#show-description:hover {
+    background: rgba(100, 100, 200, 0.6);
+    border: 1px solid rgba(100, 100, 200, 0.7);
+}
+
+.btn-like {
+  background: rgba(76, 175, 80, 0.6); /* Greenish, more opaque */
+  border: 1px solid rgba(76, 175, 80, 0.7);
+}
+
+.btn-like:hover {
+  background: rgba(76, 175, 80, 0.7);
+  border: 1px solid rgba(76, 175, 80, 0.8);
+}
+
+.session-info {
+  background: rgba(255,255,255,0.08);
+  padding: 12px 16px; /* Adjusted padding */
+  border-radius: 15px; /* Adjusted radius */
+  margin-bottom: 20px;
+  font-size: 0.9rem; /* Adjusted font size */
+  width: 100%;
+  box-sizing: border-box;
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
+  border: 1px solid rgba(255,255,255,0.15);
+  box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+  animation: fadeIn 0.5s ease 0.2s backwards;
+}
+
+.results-container {
+  background: rgba(76, 175, 80, 0.15);
+  padding: 30px;
+  border-radius: 24px;
+  margin-top: 20px;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(76, 175, 80, 0.3);
+  box-shadow: 0 15px 35px rgba(0,0,0,0.2);
+  width: 100%;
+}
+
+.results-container.show {
+  animation: fadeIn 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.results-container h3 {
+  font-size: 1.8rem;
+  margin-top: 0;
+  margin-bottom: 20px;
+}
+
+.restart-btn {
+  background: rgba(255,255,255,0.2);
+  margin-top: 24px;
+  font-weight: 600;
+  padding: 16px 30px;
+}
+
+#matched-movies div {
+  transition: all 0.3s ease;
+}
+
+#matched-movies div:hover {
+  transform: translateX(5px);
+  background: rgba(255,255,255,0.2) !important;
+}
+
+footer {
+  position: relative; /* Changed from fixed to flow with content */
+  bottom: auto;
+  width: 100%;
+  text-align: center;
+  font-size: 0.8rem;
+  opacity: 0.6;
+  padding: 20px 10px 10px; /* Added top padding */
+  z-index: 10;
+  color: #eee; /* Lighter color for footer text on dark bg */
+}
+
+@media (max-width: 480px) { /* Adjusted breakpoint */
+  body {
+    padding: 10px;
+  }
+  
+  main {
+    max-width: 100%; /* Full width on small screens */
+  }
+
+  h1 {
+    font-size: 2rem;
+    margin-bottom: 15px;
+  }
+  
+  .app-container {
+    padding: 20px 15px; /* Adjusted padding */
+    border-radius: 20px;
+  }
+  
+  .card-container {
+    min-height: 350px;
+  }
+
+  .movie-card {
+    padding: 20px;
+    border-radius: 20px;
+  }
+
+  .movie-poster {
+    width: 100px;
+    height: 150px;
+  }
+
+  .button-container {
+    /* Keep as row for small screens if space allows, or stack if preferred */
+    gap: 10px;
+  }
+
+  button {
+    padding: 12px 15px;
+    font-size: 0.9rem;
+  }
+  
+  .movie-content h2 {
+    font-size: 1.4rem;
+  }
+  
+  .results-container {
+    padding: 15px;
+  }
+}
