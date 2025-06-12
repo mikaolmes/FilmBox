@@ -2,6 +2,8 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from 'react';
+import io from 'socket.io-client';
+import type { Socket } from 'socket.io-client';
 
 interface TmdbMovie {
   id: number;
@@ -31,21 +33,36 @@ interface TmdbGenre {
   name: string;
 }
 
-const TMDB_IMAGE_BASE_URL = "https://image.tmdb.org/t/p/w500"; // Base URL for posters
+// Add room interfaces if needed
+interface RoomUser {
+  id: string;
+  name: string;
+}
+
+interface RoomState {
+  roomId: string;
+  users: RoomUser[];
+  movies: Movie[];
+  votes: Record<number, string[]>;
+}
+
+const TMDB_IMAGE_BASE_URL = "https://image.tmdb.org/t/p/w500";
 
 // Helper function to shuffle an array (Fisher-Yates shuffle)
 function shuffleArray<T>(array: T[]): T[] {
   const newArray = [...array];
   for (let i = newArray.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
-    [newArray[i], newArray[j]] = [newArray[j], newArray[i]]; // Swap elements
+    [newArray[i], newArray[j]] = [newArray[j], newArray[i]];
   }
   return newArray;
 }
 
+// Remove duplicate declaration and keep only one FilmBoxApp component
+// Rename FilmBoxAppComponent to FilmBoxApp if you haven't already
 const FilmBoxApp: React.FC = () => {
-  const [allFetchedMovies, setAllFetchedMovies] = useState<Movie[]>([]); // Store all movies fetched
-  const [movies, setMovies] = useState<Movie[]>([]); // Current 20 movies for the session
+  const [allFetchedMovies, setAllFetchedMovies] = useState<Movie[]>([]);
+  const [movies, setMovies] = useState<Movie[]>([]);
   const [genresMap, setGenresMap] = useState<Map<number, string>>(new Map());
   const [currentIndex, setCurrentIndex] = useState<number>(0);
   const [likedMovies, setLikedMovies] = useState<Movie[]>([]);
@@ -54,7 +71,74 @@ const FilmBoxApp: React.FC = () => {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Fetch genres and movies
+  // Socket and Room State
+  const [socket, setSocket] = useState<typeof Socket | null>(null); // Use the imported Socket type
+  const [roomId, setRoomId] = useState<string>('');
+  const [roomUsers, setRoomUsers] = useState<RoomUser[]>([]);
+  const [isInRoom, setIsInRoom] = useState<boolean>(false);
+  const [userName, setUserName] = useState<string>('');
+  const [inputRoomId, setInputRoomId] = useState<string>('');
+
+  // Initialize Socket Connection (useEffect - as previously defined)
+  useEffect(() => {
+    const newSocket = io();
+    setSocket(newSocket);
+
+    newSocket.on('connect', () => {
+      console.log('Connected to socket server with ID:', newSocket.id);
+    });
+
+    newSocket.on('disconnect', () => {
+      console.log('Disconnected from socket server');
+    });
+
+    newSocket.on('roomState', (updatedRoomState: RoomState) => {
+      console.log('Received room state:', updatedRoomState);
+      setRoomId(updatedRoomState.roomId);
+      setRoomUsers(updatedRoomState.users);
+      setIsInRoom(true); // User is in a room if we receive its state
+      // Potentially sync movies: setMovies(updatedRoomState.movies);
+    });
+
+    newSocket.on('userJoined', (user: RoomUser) => {
+      console.log('User joined:', user);
+      setRoomUsers(prevUsers => {
+        // Avoid adding duplicate users if this event is received multiple times
+        if (prevUsers.find(u => u.id === user.id)) return prevUsers;
+        return [...prevUsers, user];
+      });
+    });
+
+    newSocket.on('userLeft', (userId: string) => {
+      console.log('User left:', userId);
+      setRoomUsers(prevUsers => prevUsers.filter(u => u.id !== userId));
+    });
+
+    newSocket.on('roomNotFound', (message: string) => {
+      alert(message);
+      setIsInRoom(false);
+      setRoomId('');
+      setInputRoomId('');
+    });
+
+    newSocket.on('roomCreated', (data: { roomId: string, user: RoomUser }) => {
+      console.log('Room created:', data.roomId, 'by user:', data.user);
+      setRoomId(data.roomId);
+      setInputRoomId(data.roomId);
+      setRoomUsers([data.user]); // Creator is the first user
+      setIsInRoom(true);
+    });
+    
+    // Make sure to include 'socket' in the dependency array if it's used inside 'roomCreated' logic
+    // However, 'socket' from useState might cause re-runs. 'newSocket' is stable within this effect.
+    // The 'joinRoom' emit inside 'roomCreated' was problematic, better to handle join confirmation from server.
+
+    return () => {
+      newSocket.disconnect();
+    };
+  }, [userName]); // Added userName as a dependency because it's used in the effect for auto-join logic
+
+  // Fetch genres and movies (existing useEffect - keep as is)
   useEffect(() => {
     const fetchData = async () => {
       setIsLoading(true);
@@ -221,14 +305,57 @@ const FilmBoxApp: React.FC = () => {
     return <div className="app-container"><p>Keine Filme gefunden. Versuchen Sie es später erneut.</p></div>;
   }
 
+  // New UI section for Room Management (before the movie display logic)
+  if (!isInRoom) {
+    return (
+      <div className="app-container" lang="de">
+        <h1>🎬 FilmBox - Lobby</h1>
+        <div className="room-management" style={{ margin: '20px auto', padding: '20px', background: 'rgba(0,0,0,0.2)', borderRadius: '8px', maxWidth: '400px' }}>
+          <input 
+            type="text" 
+            placeholder="Benutzername (optional)"
+            value={userName}
+            onChange={(e) => setUserName(e.target.value)}
+            style={{ display: 'block', width: 'calc(100% - 22px)', padding: '10px', marginBottom: '10px', borderRadius: '4px', border: '1px solid #555' }}
+          />
+          <input 
+            type="text" 
+            placeholder="Raum-ID (leer für neuen Raum)"
+            value={inputRoomId}
+            onChange={(e) => setInputRoomId(e.target.value)}
+            style={{ display: 'block', width: 'calc(100% - 22px)', padding: '10px', marginBottom: '10px', borderRadius: '4px', border: '1px solid #555' }}
+          />
+          {/* Ensure these onClick handlers are correctly referencing the functions defined above */}
+          <button onClick={handleCreateRoom} style={{ padding: '10px 15px', marginRight: '10px', background: '#28a745', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
+            Raum erstellen
+          </button>
+          <button onClick={handleJoinRoom} disabled={!inputRoomId.trim()} style={{ padding: '10px 15px', background: '#007bff', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
+            Raum beitreten
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Existing return statement for when isInRoom is true (or for single-player mode if not in room)
+  // You might want to wrap the existing movie display logic with a check for `isInRoom`
+  // or adjust it to show room-specific info.
+
   return (
     <div lang="de" role="main">
       <div className="app-container">
         <h1>
-          {/* You can add an SVG icon here if you have one */}
-          {/* Example: <svg>...</svg> */}
-          🎬 FilmBox
+          🎬 FilmBox {roomId && <span style={{fontSize: '0.6em', color: '#ccc'}}>(Raum: {roomId})</span>}
         </h1>
+        {isInRoom && (
+          <div className="room-info" style={{ marginBottom: '15px', padding: '10px', background: 'rgba(255,255,255,0.05)', borderRadius: '5px' }}>
+            <p>Benutzer im Raum: {roomUsers.map(u => u.name || u.id).join(', ')}</p>
+            {/* Ensure this onClick handler is correctly referencing the function defined above */}
+            <button onClick={handleLeaveRoom} style={{ padding: '8px 12px', background: '#dc3545', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', marginTop: '5px' }}>
+              Raum verlassen
+            </button>
+          </div>
+        )}
 
         {!showResults ? (
           <>
@@ -315,4 +442,26 @@ const FilmBoxApp: React.FC = () => {
   );
 };
 
+const handleCreateRoom = () => {
+  if (!socket) return;
+  const name = userName.trim() || `User-${Math.random().toString(36).substr(2, 6)}`;
+  socket.emit('createRoom', { userName: name });
+};
+
+const handleJoinRoom = () => {
+  if (!socket || !inputRoomId.trim()) return;
+  const name = userName.trim() || `User-${Math.random().toString(36).substr(2, 6)}`;
+  socket.emit('joinRoom', { roomId: inputRoomId, userName: name });
+};
+
+const handleLeaveRoom = () => {
+  if (!socket || !roomId) return;
+  socket.emit('leaveRoom', { roomId });
+  setIsInRoom(false);
+  setRoomId('');
+  setInputRoomId('');
+  setRoomUsers([]);
+};
+
+// Make sure this is the ONLY default export in the entire file
 export default FilmBoxApp;
