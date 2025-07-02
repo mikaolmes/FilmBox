@@ -4,6 +4,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import io from 'socket.io-client';
 import type { Socket } from 'socket.io-client';
+import Lobby from './Lobby'; // Import the Lobby component
+import Room from './Room';   // Import the Room component
 
 interface TmdbMovie {
   id: number;
@@ -72,32 +74,92 @@ const FilmBoxApp: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
 
   // Socket and Room State
-  const [socket, setSocket] = useState<typeof Socket | null>(null); // Use the imported Socket type
+  const [socket, setSocket] = useState<Socket | null>(null);
   const [roomId, setRoomId] = useState<string>('');
   const [roomUsers, setRoomUsers] = useState<RoomUser[]>([]);
   const [isInRoom, setIsInRoom] = useState<boolean>(false);
   const [userName, setUserName] = useState<string>('');
-  const [inputRoomId, setInputRoomId] = useState<string>('');
+  const [sessionStarted, setSessionStarted] = useState<boolean>(false);
+  const [matchedMovies, setMatchedMovies] = useState<Movie[]>([]);
+  const [waitingForOthers, setWaitingForOthers] = useState<boolean>(false);
+  const [connectionStatus, setConnectionStatus] = useState<'connected' | 'disconnected' | 'error'>('disconnected');
 
-  // Initialize Socket Connection (useEffect - as previously defined)
+  const handleCreateRoom = () => {
+    if (socket) {
+      const finalUserName = userName.trim() || `User_${Math.random().toString(36).substr(2, 5)}`;
+      if (!userName.trim()) setUserName(finalUserName);
+      socket.emit('createRoom', { userName: finalUserName });
+    }
+  };
+
+
+
+  const handleJoinRoom = (roomIdToJoin: string) => {
+    if (socket && roomIdToJoin) {
+      const finalUserName = userName.trim() || `User_${Math.random().toString(36).substr(2, 5)}`;
+      if (!userName.trim()) setUserName(finalUserName);
+      socket.emit('joinRoom', { roomId: roomIdToJoin, userName: finalUserName });
+    }
+  };
+
+  const handleLeaveRoom = () => {
+    if (socket && roomId) {
+      socket.emit('leaveRoom', { roomId });
+      setIsInRoom(false);
+      setRoomId('');
+      setRoomUsers([]);
+      setSessionStarted(false); // Reset session state on leaving
+    }
+  };
+
+  const handleStartSession = () => {
+    if (socket && roomId) {
+      socket.emit('startSession', { roomId });
+    }
+  };
+
+  // Initialize Socket Connection
   useEffect(() => {
-    const newSocket = io();
+    // The socket connection is now simplified.
+    // It will connect to the server and the server will handle the one-time initialization.
+    const newSocket = io({ path: '/api/socket' });
     setSocket(newSocket);
 
     newSocket.on('connect', () => {
       console.log('Connected to socket server with ID:', newSocket.id);
+      setConnectionStatus('connected');
+    });
+
+    newSocket.on('connect_error', (error: Error) => {
+      console.error('Socket connection error:', error);
+      setConnectionStatus('error');
     });
 
     newSocket.on('disconnect', () => {
       console.log('Disconnected from socket server');
+      setConnectionStatus('disconnected');
     });
 
-    newSocket.on('roomState', (updatedRoomState: RoomState) => {
+    newSocket.on('roomState', (updatedRoomState: any) => {
       console.log('Received room state:', updatedRoomState);
-      setRoomId(updatedRoomState.roomId);
+      setRoomId(updatedRoomState.id); // Corrected from roomId to id
       setRoomUsers(updatedRoomState.users);
-      setIsInRoom(true); // User is in a room if we receive its state
-      // Potentially sync movies: setMovies(updatedRoomState.movies);
+      setIsInRoom(true);
+    });
+
+    newSocket.on('sessionStarted', ({ movies: newMovies }: { movies: Movie[] }) => {
+      console.log('Session started, received movies:', newMovies);
+      setMovies(newMovies);
+      setAllFetchedMovies(newMovies); // Also update the source of truth
+      setCurrentIndex(0);
+      setSessionStarted(true);
+    });
+
+    newSocket.on('sessionEnded', ({ matchedMovies }: { matchedMovies: Movie[] }) => {
+      console.log('Session ended, received matches:', matchedMovies);
+      setMatchedMovies(matchedMovies);
+      setShowResults(true);
+      setWaitingForOthers(false);
     });
 
     newSocket.on('userJoined', (user: RoomUser) => {
@@ -118,25 +180,19 @@ const FilmBoxApp: React.FC = () => {
       alert(message);
       setIsInRoom(false);
       setRoomId('');
-      setInputRoomId('');
     });
 
     newSocket.on('roomCreated', (data: { roomId: string, user: RoomUser }) => {
       console.log('Room created:', data.roomId, 'by user:', data.user);
       setRoomId(data.roomId);
-      setInputRoomId(data.roomId);
       setRoomUsers([data.user]); // Creator is the first user
       setIsInRoom(true);
     });
-    
-    // Make sure to include 'socket' in the dependency array if it's used inside 'roomCreated' logic
-    // However, 'socket' from useState might cause re-runs. 'newSocket' is stable within this effect.
-    // The 'joinRoom' emit inside 'roomCreated' was problematic, better to handle join confirmation from server.
 
     return () => {
       newSocket.disconnect();
     };
-  }, [userName]); // Added userName as a dependency because it's used in the effect for auto-join logic
+  }, []); // Removed userName dependency as it's not directly used for connection anymore
 
   // Fetch genres and movies (existing useEffect - keep as is)
   useEffect(() => {
@@ -217,81 +273,80 @@ const FilmBoxApp: React.FC = () => {
     if (currentIndex < movies.length - 1) {
       setCurrentIndex(prevIndex => prevIndex + 1);
     } else {
-      setShowResults(true);
+      console.log('[CLIENT] All movies voted, setting waitingForOthers to true');
+      setWaitingForOthers(true);
     }
   }, [currentIndex, movies.length]);
 
-  const handleLike = () => {
-    if (currentMovie) {
-      setLikedMovies(prevLikedMovies => [...prevLikedMovies, currentMovie]);
+  const handleLike = useCallback(() => {
+    if (socket && roomId && currentMovie) {
+      console.log('[CLIENT] Emitting submitVote (like):', { roomId, movieId: currentMovie.id, vote: 'like' });
+      socket.emit('submitVote', { roomId, movieId: currentMovie.id, vote: 'like' });
     }
+    console.log('[CLIENT] handleNextMovie called (like)');
     handleNextMovie();
-  };
+  }, [socket, roomId, currentMovie, handleNextMovie]);
 
-  const handleDislike = () => {
+  const handleDislike = useCallback(() => {
+    if (socket && roomId && currentMovie) {
+      console.log('[CLIENT] Emitting submitVote (dislike):', { roomId, movieId: currentMovie.id, vote: 'dislike' });
+      socket.emit('submitVote', { roomId, movieId: currentMovie.id, vote: 'dislike' });
+    }
+    console.log('[CLIENT] handleNextMovie called (dislike)');
     handleNextMovie();
-  };
+  }, [socket, roomId, currentMovie, handleNextMovie]);
 
-  const handleShowDescription = () => {
+  const handleShowDescription = useCallback(() => {
     setIsDescriptionVisible(prev => !prev);
-  };
+  }, []);
 
-  const restartSession = () => {
+  const restartSession = useCallback(() => {
+    setMovies(shuffleArray(allFetchedMovies).slice(0, 20));
     setCurrentIndex(0);
     setLikedMovies([]);
     setShowResults(false);
     setIsDescriptionVisible(false);
-    // Re-shuffle from all fetched movies and take a new set of 20
-    if (allFetchedMovies.length > 0) {
-        setMovies(shuffleArray(allFetchedMovies).slice(0, 20));
-    } else {
-        // Optionally, trigger a re-fetch if allFetchedMovies is empty, though initial fetch should handle this.
-        // For now, if allFetchedMovies is empty, it implies an initial fetch issue.
-        console.warn("Attempted to restart session with no movies in the pool.");
+  }, [allFetchedMovies]);
+
+  const handleKeyDown = useCallback((event: KeyboardEvent) => {
+    if (showResults) {
+      if (event.key === ' ' || event.key === 'Enter') { // Allow restart from results with Space/Enter
+        event.preventDefault();
+        restartSession();
+      }
+      return;
     }
-  };
 
-  // Keyboard event handling (useEffect)
+    switch(event.key) {
+      case 'ArrowLeft':
+        event.preventDefault();
+        handleDislike();
+        break;
+      case 'ArrowRight':
+        event.preventDefault();
+        handleLike();
+        break;
+      case 'ArrowDown':
+        event.preventDefault();
+        handleShowDescription();
+        break;
+      case ' ':
+      case 'Enter': // Assuming space or enter might be used for restart if no other primary action
+        // This was 'restart' in the original, but there's no always-visible restart button
+        // We can map it to 'like' or another action if preferred, or keep for a potential future restart button
+        // For now, let's make space also like the movie if not showing results
+        event.preventDefault();
+        handleLike(); 
+        break;
+    }
+  }, [handleDislike, handleLike, handleShowDescription, restartSession, showResults]);
+
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (showResults) {
-        if (e.key === ' ' || e.key === 'Enter') { // Allow restart from results with Space/Enter
-          e.preventDefault();
-          restartSession();
-        }
-        return;
-      }
-
-      switch(e.key) {
-        case 'ArrowLeft':
-          e.preventDefault();
-          handleDislike();
-          break;
-        case 'ArrowRight':
-          e.preventDefault();
-          handleLike();
-          break;
-        case 'ArrowDown':
-          e.preventDefault();
-          handleShowDescription();
-          break;
-        case ' ':
-        case 'Enter': // Assuming space or enter might be used for restart if no other primary action
-          // This was 'restart' in the original, but there's no always-visible restart button
-          // We can map it to 'like' or another action if preferred, or keep for a potential future restart button
-          // For now, let's make space also like the movie if not showing results
-          e.preventDefault();
-          handleLike(); 
-          break;
-      }
-    };
-
     document.addEventListener('keydown', handleKeyDown);
     return () => {
       document.removeEventListener('keydown', handleKeyDown);
     };
-  // Ensure all dependencies used in handleKeyDown are listed if they can change
-  }, [handleDislike, handleLike, handleShowDescription, restartSession, showResults]);
+  }, [handleKeyDown]);
 
   if (isLoading) {
     return <div className="app-container"><p>Filme werden geladen...</p></div>;
@@ -305,58 +360,86 @@ const FilmBoxApp: React.FC = () => {
     return <div className="app-container"><p>Keine Filme gefunden. Versuchen Sie es später erneut.</p></div>;
   }
 
-  // New UI section for Room Management (before the movie display logic)
   if (!isInRoom) {
+    return <Lobby 
+        userName={userName} 
+        setUserName={setUserName} 
+        handleCreateRoom={handleCreateRoom} 
+        handleJoinRoom={handleJoinRoom} 
+    />;
+  }
+
+  if (isInRoom && !sessionStarted) {
+    const isCreator = roomUsers.length > 0 && roomUsers[0].id === socket?.id;
+    return <Room 
+        roomId={roomId} 
+        users={roomUsers} 
+        isCreator={isCreator}
+        handleLeaveRoom={handleLeaveRoom} 
+        handleStartSession={handleStartSession} 
+    />;
+  }
+
+  if (waitingForOthers) {
     return (
-      <div className="app-container" lang="de">
-        <h1>🎬 FilmBox - Lobby</h1>
-        <div className="room-management" style={{ margin: '20px auto', padding: '20px', background: 'rgba(0,0,0,0.2)', borderRadius: '8px', maxWidth: '400px' }}>
-          <input 
-            type="text" 
-            placeholder="Benutzername (optional)"
-            value={userName}
-            onChange={(e) => setUserName(e.target.value)}
-            style={{ display: 'block', width: 'calc(100% - 22px)', padding: '10px', marginBottom: '10px', borderRadius: '4px', border: '1px solid #555' }}
-          />
-          <input 
-            type="text" 
-            placeholder="Raum-ID (leer für neuen Raum)"
-            value={inputRoomId}
-            onChange={(e) => setInputRoomId(e.target.value)}
-            style={{ display: 'block', width: 'calc(100% - 22px)', padding: '10px', marginBottom: '10px', borderRadius: '4px', border: '1px solid #555' }}
-          />
-          {/* Ensure these onClick handlers are correctly referencing the functions defined above */}
-          <button onClick={handleCreateRoom} style={{ padding: '10px 15px', marginRight: '10px', background: '#28a745', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
-            Raum erstellen
-          </button>
-          <button onClick={handleJoinRoom} disabled={!inputRoomId.trim()} style={{ padding: '10px 15px', background: '#007bff', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
-            Raum beitreten
-          </button>
-        </div>
+      <div className="app-container" style={{ textAlign: 'center', padding: '40px' }}>
+        <h2>Warte auf andere Nutzer...</h2>
+        <p>Du hast alle Filme bewertet. Bitte warte, bis alle anderen Nutzer fertig sind.</p>
+        <div className="loader" style={{ margin: '30px auto', width: '60px', height: '60px', border: '8px solid #eee', borderTop: '8px solid #2196f3', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
+        <style>{`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}</style>
       </div>
     );
   }
 
-  // Existing return statement for when isInRoom is true (or for single-player mode if not in room)
-  // You might want to wrap the existing movie display logic with a check for `isInRoom`
-  // or adjust it to show room-specific info.
+  if (showResults) {
+    return (
+        <div className="app-container results-container" lang="de">
+            <h3>🎉 Perfekte Matches gefunden!</h3>
+            <div id="matched-movies">
+              {matchedMovies.length === 0 ? (
+                <>
+                  <p>😕 Keine gemeinsamen Film-Matches gefunden.</p>
+                  <p>Startet eine neue Runde, um es erneut zu versuchen!</p>
+                </>
+              ) : (
+                <>
+                  <p>Ihr habt euch auf <strong>{matchedMovies.length}</strong> Film(e) geeinigt:</p>
+                  <div className="liked-movies-grid" style={{ marginTop: '15px' }}>
+                    {matchedMovies.map(movie => (
+                      <div key={movie.id} className="liked-movie-item" style={{ background: 'rgba(255,255,255,0.1)', padding: '10px', margin: '10px', borderRadius: '10px', textAlign: 'center' }}>
+                        <img 
+                          src={movie.poster} 
+                          alt={movie.title} 
+                          style={{ width: '100px', height: '150px', objectFit: 'cover', borderRadius: '8px', marginBottom: '5px' }} 
+                          onError={(e) => (e.currentTarget.src = '/placeholder-brain.png')}
+                        />
+                        <strong style={{ display: 'block', color: '#fff' }}>{movie.title}</strong> 
+                        <span style={{ fontSize: '0.9em', color: '#ccc' }}>({movie.year})</span>
+                        <br />
+                        <small style={{ fontSize: '0.8em', color: '#bbb' }}>{movie.genre.join(', ')}</small>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+            <button id="restart" className="restart-btn" onClick={restartSession}>🔄 Neue Runde starten</button>
+        </div>
+    );
+  }
+
+  let statusColor = '#aaa', statusText = '';
+  if (connectionStatus === 'connected') { statusColor = '#28a745'; statusText = 'Verbunden'; }
+  else if (connectionStatus === 'disconnected') { statusColor = '#dc3545'; statusText = 'Getrennt'; }
+  else if (connectionStatus === 'error') { statusColor = '#ff9800'; statusText = 'Fehler'; }
 
   return (
     <div lang="de" role="main">
+      <div style={{ position: 'absolute', top: 10, left: 10, zIndex: 1000, display: 'flex', alignItems: 'center' }}>
+        <span style={{ width: 12, height: 12, borderRadius: '50%', background: statusColor, display: 'inline-block', marginRight: 8, border: '1px solid #222' }}></span>
+        <span style={{ color: statusColor, fontWeight: 600 }}>{statusText}</span>
+      </div>
       <div className="app-container">
-        <h1>
-          🎬 FilmBox {roomId && <span style={{fontSize: '0.6em', color: '#ccc'}}>(Raum: {roomId})</span>}
-        </h1>
-        {isInRoom && (
-          <div className="room-info" style={{ marginBottom: '15px', padding: '10px', background: 'rgba(255,255,255,0.05)', borderRadius: '5px' }}>
-            <p>Benutzer im Raum: {roomUsers.map(u => u.name || u.id).join(', ')}</p>
-            {/* Ensure this onClick handler is correctly referencing the function defined above */}
-            <button onClick={handleLeaveRoom} style={{ padding: '8px 12px', background: '#dc3545', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', marginTop: '5px' }}>
-              Raum verlassen
-            </button>
-          </div>
-        )}
-
         {!showResults ? (
           <>
             {currentMovie && (
@@ -442,26 +525,7 @@ const FilmBoxApp: React.FC = () => {
   );
 };
 
-const handleCreateRoom = () => {
-  if (!socket) return;
-  const name = userName.trim() || `User-${Math.random().toString(36).substr(2, 6)}`;
-  socket.emit('createRoom', { userName: name });
-};
 
-const handleJoinRoom = () => {
-  if (!socket || !inputRoomId.trim()) return;
-  const name = userName.trim() || `User-${Math.random().toString(36).substr(2, 6)}`;
-  socket.emit('joinRoom', { roomId: inputRoomId, userName: name });
-};
-
-const handleLeaveRoom = () => {
-  if (!socket || !roomId) return;
-  socket.emit('leaveRoom', { roomId });
-  setIsInRoom(false);
-  setRoomId('');
-  setInputRoomId('');
-  setRoomUsers([]);
-};
 
 // Make sure this is the ONLY default export in the entire file
 export default FilmBoxApp;

@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Socket.IO Test</title>
+    <script src="https://cdn.socket.io/4.8.1/socket.io.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        #status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+        }
+        .connected {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        .disconnected {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        .error {
+            background-color: #fff3cd;
+            color: #856404;
+        }
+        #log {
+            height: 300px;
+            overflow-y: auto;
+            border: 1px solid #ccc;
+            padding: 10px;
+            margin-top: 20px;
+            background-color: #f8f9fa;
+        }
+        .log-entry {
+            margin-bottom: 5px;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 5px;
+        }
+        button {
+            padding: 8px 16px;
+            margin-right: 10px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #0069d9;
+        }
+        input {
+            padding: 8px;
+            margin-right: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Socket.IO Connection Test</h1>
+    
+    <div id="status" class="disconnected">Disconnected</div>
+    
+    <div>
+        <input type="text" id="username" placeholder="Your username">
+        <button id="createRoom">Create Room</button>
+        <input type="text" id="roomId" placeholder="Room ID">
+        <button id="joinRoom">Join Room</button>
+        <button id="leaveRoom">Leave Room</button>
+    </div>
+    
+    <div id="log"></div>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const statusEl = document.getElementById('status');
+            const logEl = document.getElementById('log');
+            const usernameEl = document.getElementById('username');
+            const roomIdEl = document.getElementById('roomId');
+            const createRoomBtn = document.getElementById('createRoom');
+            const joinRoomBtn = document.getElementById('joinRoom');
+            const leaveRoomBtn = document.getElementById('leaveRoom');
+            
+            let currentRoomId = '';
+            let socket = null;
+            
+            function log(message) {
+                const entry = document.createElement('div');
+                entry.className = 'log-entry';
+                entry.textContent = `${new Date().toLocaleTimeString()}: ${message}`;
+                logEl.appendChild(entry);
+                logEl.scrollTop = logEl.scrollHeight;
+            }
+            
+            function initializeSocket() {
+                // Initialize socket with the root path (using rewrites from next.config.mjs)
+                log('Connecting to Socket.IO server...');
+                socket = io({ path: '/api/socket' });
+                
+                // Connection events
+                socket.on('connect', () => {
+                    statusEl.className = 'connected';
+                    statusEl.textContent = `Connected (ID: ${socket.id})`;
+                    log('Connected to server');
+                });
+                
+                socket.on('disconnect', () => {
+                    statusEl.className = 'disconnected';
+                    statusEl.textContent = 'Disconnected';
+                    log('Disconnected from server');
+                });
+                
+                socket.on('connect_error', (error) => {
+                    statusEl.className = 'error';
+                    statusEl.textContent = `Connection Error: ${error.message}`;
+                    log(`Connection error: ${error.message}`);
+                });
+                
+                // Room events
+                socket.on('roomCreated', ({ roomId, user }) => {
+                    log(`Room created: ${roomId}`);
+                    currentRoomId = roomId;
+                    roomIdEl.value = roomId;
+                });
+                
+                socket.on('roomState', (room) => {
+                    log(`Room state received: ${JSON.stringify(room)}`);
+                });
+                
+                socket.on('userJoined', (user) => {
+                    log(`User joined: ${user.name} (${user.id})`);
+                });
+                
+                socket.on('userLeft', (userId) => {
+                    log(`User left: ${userId}`);
+                });
+                
+                socket.on('roomNotFound', (message) => {
+                    log(`Error: ${message}`);
+                });
+            }
+
+            initializeSocket();
+            
+            // Button handlers
+            createRoomBtn.addEventListener('click', () => {
+                if (!socket) {
+                    log('Error: Socket not connected');
+                    return;
+                }
+                
+                const userName = usernameEl.value.trim() || `User_${Math.random().toString(36).substr(2, 5)}`;
+                if (!userName) {
+                    usernameEl.value = userName;
+                }
+                
+                socket.emit('createRoom', { userName });
+                log(`Creating room as ${userName}...`);
+            });
+            
+            joinRoomBtn.addEventListener('click', () => {
+                if (!socket) {
+                    log('Error: Socket not connected');
+                    return;
+                }
+                
+                const roomId = roomIdEl.value.trim();
+                const userName = usernameEl.value.trim() || `User_${Math.random().toString(36).substr(2, 5)}`;
+                
+                if (!roomId) {
+                    log('Error: Please enter a room ID');
+                    return;
+                }
+                
+                if (!userName) {
+                    usernameEl.value = userName;
+                }
+                
+                socket.emit('joinRoom', { roomId, userName });
+                currentRoomId = roomId;
+                log(`Joining room ${roomId} as ${userName}...`);
+            });
+            
+            leaveRoomBtn.addEventListener('click', () => {
+                if (!socket) {
+                    log('Error: Socket not connected');
+                    return;
+                }
+                
+                if (!currentRoomId) {
+                    log('Error: Not in a room');
+                    return;
+                }
+                
+                socket.emit('leaveRoom', { roomId: currentRoomId });
+                log(`Leaving room ${currentRoomId}...`);
+                currentRoomId = '';
+            });
+        });
+    </script>
+</body>
+</html>
