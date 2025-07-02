@@ -106,7 +106,9 @@ const SocketHandler = (req: NextApiRequest, res: NextApiResponseWithSocket) => {
           // Fetch movies from TMDB (or use a cached list)
           // This is a simplified example. In a real app, you'd use a proper API helper.
           const apiKey = process.env.NEXT_PUBLIC_TMDB_API_KEY;
-          const movieResponse = await fetch(`https://api.themoviedb.org/3/movie/popular?api_key=${apiKey}&language=de-DE&page=1`);
+          const randomPage = Math.floor(Math.random() * 10) + 1; // 1-10
+          console.log(`[startSession] Fetching TMDB popular movies, page ${randomPage}`);
+          const movieResponse = await fetch(`https://api.themoviedb.org/3/movie/popular?api_key=${apiKey}&language=de-DE&page=${randomPage}`);
           const movieData = await movieResponse.json();
           const genreResponse = await fetch(`https://api.themoviedb.org/3/genre/movie/list?api_key=${apiKey}&language=de-DE`);
           const genreData = await genreResponse.json();
@@ -211,6 +213,36 @@ const SocketHandler = (req: NextApiRequest, res: NextApiResponseWithSocket) => {
             }
           }
         });
+      });
+
+      socket.on('restartSession', async ({ roomId }: { roomId: string }) => {
+        const room = rooms.get(roomId);
+        if (room && room.users[0].id === socket.id) {
+          const apiKey = process.env.NEXT_PUBLIC_TMDB_API_KEY;
+          const randomPage = Math.floor(Math.random() * 10) + 1; // 1-10
+          console.log(`[restartSession] Host ${socket.id} restarting session for room ${roomId}, page ${randomPage}`);
+          const movieResponse = await fetch(`https://api.themoviedb.org/3/movie/popular?api_key=${apiKey}&language=de-DE&page=${randomPage}`);
+          const movieData = await movieResponse.json();
+          const genreResponse = await fetch(`https://api.themoviedb.org/3/genre/movie/list?api_key=${apiKey}&language=de-DE`);
+          const genreData = await genreResponse.json();
+          const genresMap = new Map<number, string>(genreData.genres.map((g: any) => [g.id, g.name]));
+
+          const movies: Movie[] = movieData.results.slice(0, 20).map((tmdbMovie: any) => ({
+            id: tmdbMovie.id,
+            title: tmdbMovie.title,
+            year: parseInt(tmdbMovie.release_date?.split('-')[0] || "0"),
+            genre: tmdbMovie.genre_ids.map((id: number) => genresMap.get(id) || `ID ${id}`).slice(0, 3),
+            description: tmdbMovie.overview,
+            poster: tmdbMovie.poster_path ? `https://image.tmdb.org/t/p/w500${tmdbMovie.poster_path}` : "/placeholder-brain.png",
+          }));
+
+          room.movies = movies;
+          room.votes = {};
+          room.finishedUsers = [];
+          rooms.set(roomId, room);
+
+          io.to(roomId).emit('sessionStarted', { movies });
+        }
       });
     });
   }

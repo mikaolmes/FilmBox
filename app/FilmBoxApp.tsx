@@ -84,6 +84,9 @@ const FilmBoxApp: React.FC = () => {
   const [waitingForOthers, setWaitingForOthers] = useState<boolean>(false);
   const [connectionStatus, setConnectionStatus] = useState<'connected' | 'disconnected' | 'error'>('disconnected');
 
+  // Add isHost state
+  const isHost = roomUsers.length > 0 && roomUsers[0].id === socket?.id;
+
   const handleCreateRoom = () => {
     if (socket) {
       const finalUserName = userName.trim() || `User_${Math.random().toString(36).substr(2, 5)}`;
@@ -153,6 +156,9 @@ const FilmBoxApp: React.FC = () => {
       setAllFetchedMovies(newMovies); // Also update the source of truth
       setCurrentIndex(0);
       setSessionStarted(true);
+      setShowResults(false);
+      setWaitingForOthers(false);
+      setMatchedMovies([]);
     });
 
     newSocket.on('sessionEnded', ({ matchedMovies }: { matchedMovies: Movie[] }) => {
@@ -300,19 +306,18 @@ const FilmBoxApp: React.FC = () => {
     setIsDescriptionVisible(prev => !prev);
   }, []);
 
-  const restartSession = useCallback(() => {
-    setMovies(shuffleArray(allFetchedMovies).slice(0, 20));
-    setCurrentIndex(0);
-    setLikedMovies([]);
-    setShowResults(false);
-    setIsDescriptionVisible(false);
-  }, [allFetchedMovies]);
+  // Replace restartSession with host-only logic
+  const handleRestartSession = useCallback(() => {
+    if (isHost && socket && roomId) {
+      socket.emit('restartSession', { roomId });
+    }
+  }, [isHost, socket, roomId]);
 
   const handleKeyDown = useCallback((event: KeyboardEvent) => {
     if (showResults) {
       if (event.key === ' ' || event.key === 'Enter') { // Allow restart from results with Space/Enter
         event.preventDefault();
-        restartSession();
+        handleRestartSession();
       }
       return;
     }
@@ -339,7 +344,7 @@ const FilmBoxApp: React.FC = () => {
         handleLike(); 
         break;
     }
-  }, [handleDislike, handleLike, handleShowDescription, restartSession, showResults]);
+  }, [handleDislike, handleLike, handleShowDescription, handleRestartSession, showResults]);
 
   useEffect(() => {
     document.addEventListener('keydown', handleKeyDown);
@@ -423,7 +428,12 @@ const FilmBoxApp: React.FC = () => {
                 </>
               )}
             </div>
-            <button id="restart" className="restart-btn" onClick={restartSession}>🔄 Neue Runde starten</button>
+            {isHost && (
+              <button id="restart" className="restart-btn" onClick={handleRestartSession}>🔄 Neue Runde starten (nur Host)</button>
+            )}
+            {!isHost && (
+              <p style={{marginTop: 24, color: '#bbb'}}>Nur der Host kann eine neue Runde starten.</p>
+            )}
         </div>
     );
   }
@@ -517,7 +527,7 @@ const FilmBoxApp: React.FC = () => {
                 </>
               )}
             </div>
-            <button id="restart" className="restart-btn" onClick={restartSession}>🔄 Neue Runde starten</button>
+            <button id="restart" className="restart-btn" onClick={handleRestartSession}>�� Neue Runde starten</button>
           </div>
         )}
       </div>
