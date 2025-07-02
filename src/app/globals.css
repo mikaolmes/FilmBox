@@ -396,3 +396,228 @@ footer {
     padding: 15px;
   }
 }
+
+/* FilmBoxApp specific styles */
+.app-container {
+  max-width: 450px; /* Max width for mobile-first approach, centered */
+  margin: 20px auto; /* Centering for larger screens */
+  padding: 20px;
+  background: rgba(40, 40, 70, 0.7); /* Example background, adjust as per your design */
+  border-radius: 20px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+  display: flex;
+  flex-direction: column;
+  align-items: center; /* Center content like title */
+  min-height: 90vh; /* Ensure it takes up most of the viewport height */
+}
+
+.app-container h1 {
+  color: #fff;
+  margin-bottom: 20px;
+}
+
+.session-info {
+  width: 100%;
+  margin-bottom: 15px;
+  color: #eee;
+}
+
+.progress-bar {
+  background-color: rgba(0,0,0,0.2);
+  border-radius: 5px;
+  height: 10px;
+  overflow: hidden; /* Ensures progress div stays within bounds */
+}
+
+.progress {
+  background-color: #00bcd4; /* A nice teal color, change as you like */
+  height: 100%;
+  transition: width 0.3s ease-in-out;
+}
+
+.card-container {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  margin-bottom: 20px;
+  min-height: 400px; /* Give it some minimum height */
+}
+
+.movie-card {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 15px;
+  padding: 15px;
+  width: 100%; /* Takes full width of its container */
+  max-width: 350px; /* Max width of the card itself */
+  text-align: center;
+  box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+}
+
+.movie-poster img {
+  max-width: 80%; /* Control poster size */
+  height: auto;
+  border-radius: 10px;
+  margin-bottom: 10px;
+  object-fit: cover; /* Ensures image covers the area, might crop */
+  max-height: 250px; /* Limit poster height */
+}
+
+.movie-content h2 {
+  font-size: 1.4em;
+  color: #fff;
+  margin: 5px 0;
+}
+
+.movie-meta {
+  font-size: 0.9em;
+  color: #ccc;
+  margin-bottom: 10px;
+}
+
+.movie-meta .genre {
+  background-color: rgba(0,0,0,0.3);
+  padding: 3px 8px;
+  border-radius: 10px;
+  margin: 0 3px;
+  font-size: 0.8em;
+}
+
+.description {
+  font-size: 0.9em;
+  color: #ddd;
+  margin-top: 10px;
+  text-align: left;
+  /* Styles for scrollable description, if not using inline */
+  /* max-height: 100px; */
+  /* overflow-y: auto; */
+}
+
+.button-container {
+  display: flex;
+  justify-content: space-around; /* Space out buttons */
+  width: 100%;
+  max-width: 380px; /* Limit width of button area */
+}
+
+.button-container button {
+  padding: 12px 15px;
+  border: none;
+  border-radius: 10px;
+  font-size: 1em;
+  cursor: pointer;
+  transition: transform 0.2s ease, background-color 0.2s ease;
+  min-width: 80px; /* Give buttons a minimum width */
+}
+
+.button-container button:hover {
+  transform: scale(1.05);
+}
+
+.btn-dislike {
+  background-color: #ff5252; /* Reddish */
+  color: white;
+}
+
+#show-description {
+  background-color: #4fc3f7; /* Bluish */
+  color: white;
+}
+
+.btn-like {
+  background-color: #4caf50; /* Greenish */
+  color: white;
+}
+
+.results-container {
+  color: #fff;
+  text-align: center;
+}
+
+.results-container h3 {
+  margin-bottom: 20px;
+}
+
+.restart-btn {
+  margin-top: 20px;
+  padding: 10px 20px;
+  background-color: #00bcd4;
+  color: white;
+  border: none;
+  border-radius: 10px;
+  font-size: 1em;
+  cursor: pointer;
+}
+
+/* Desktop specific adjustments (example) */
+@media (min-width: 768px) {
+  .app-container {
+    max-width: 600px; /* Wider container on desktop */
+  }
+
+  .movie-card {
+    max-width: 450px; /* Slightly wider card on desktop */
+  }
+
+  .movie-poster img {
+    max-height: 300px; /* Allow larger posters on desktop */
+  }
+
+  .button-container button {
+    padding: 15px 25px; /* Larger buttons */
+    font-size: 1.1em;
+  }
+}
+
+.liked-movies-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); /* Responsive grid */
+  gap: 15px; /* Space between items */
+  text-align: left; /* Align text within grid items if needed, or center in item */
+}
+
+.liked-movie-item {
+  background: rgba(255,255,255,0.1);
+  padding: 15px;
+  border-radius: 10px;
+  text-align: center; /* Center content within each item */
+  display: flex;
+  flex-direction: column;
+  align-items: center; /* Center items horizontally */
+}
+
+.liked-movie-item img {
+  width: 100%; /* Make image take full width of its container (grid cell) */
+  max-width: 120px; /* But not too large */
+  height: auto; /* Maintain aspect ratio */
+  aspect-ratio: 2/3; /* Common poster aspect ratio */
+  object-fit: cover;
+  border-radius: 8px;
+  margin-bottom: 10px;
+}
+
+.liked-movie-item strong {
+  display: block; /* Make title take full width */
+  color: #fff; /* White color for title */
+  font-size: 1em;
+  margin-bottom: 3px;
+}
+
+.liked-movie-item span {
+  font-size: 0.9em;
+  color: #ccc; /* Lighter color for year */
+  margin-bottom: 5px;
+}
+
+.liked-movie-item small {
+  font-size: 0.8em;
+  color: #bbb; /* Even lighter for genres */
+}
+
+/* Adjustments for the results container text */
+.results-container p {
+  color: #eee; /* Lighter text color for paragraphs in results */
+}
+
+.results-container h3 {
+  color: #fff; /* Ensure heading is white */
+}
