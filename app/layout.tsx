@@ -1,4 +1,4 @@
-import '../src/app/globals.css'; // Corrected relative path
+import './globals.css';
 
 export const metadata = {
   title: 'FilmBox - Find Your Perfect Movie Match',

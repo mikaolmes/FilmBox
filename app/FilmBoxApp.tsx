@@ -3,7 +3,6 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import io from 'socket.io-client';
-import type { Socket } from 'socket.io-client';
 import Lobby from './Lobby'; // Import the Lobby component
 import Room from './Room';   // Import the Room component
 
@@ -74,7 +73,7 @@ const FilmBoxApp: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
 
   // Socket and Room State
-  const [socket, setSocket] = useState<Socket | null>(null);
+  const [socket, setSocket] = useState<ReturnType<typeof io> | null>(null);
   const [roomId, setRoomId] = useState<string>('');
   const [roomUsers, setRoomUsers] = useState<RoomUser[]>([]);
   const [isInRoom, setIsInRoom] = useState<boolean>(false);
