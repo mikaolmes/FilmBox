@@ -103,32 +103,66 @@ const SocketHandler = (req: NextApiRequest, res: NextApiResponseWithSocket) => {
       socket.on('startSession', async ({ roomId }: { roomId: string }) => {
         const room = rooms.get(roomId);
         if (room && room.users[0].id === socket.id) { // Only creator can start
-          // Fetch movies from TMDB (or use a cached list)
-          // This is a simplified example. In a real app, you'd use a proper API helper.
-          const apiKey = process.env.NEXT_PUBLIC_TMDB_API_KEY;
-          const randomPage = Math.floor(Math.random() * 10) + 1; // 1-10
-          console.log(`[startSession] Fetching TMDB popular movies, page ${randomPage}`);
-          const movieResponse = await fetch(`https://api.themoviedb.org/3/movie/popular?api_key=${apiKey}&language=de-DE&page=${randomPage}`);
-          const movieData = await movieResponse.json();
-          const genreResponse = await fetch(`https://api.themoviedb.org/3/genre/movie/list?api_key=${apiKey}&language=de-DE`);
-          const genreData = await genreResponse.json();
-          const genresMap = new Map<number, string>(genreData.genres.map((g: any) => [g.id, g.name]));
+          try {
+            // Fetch movies from TMDB (or use a cached list)
+            // This is a simplified example. In a real app, you'd use a proper API helper.
+            const apiKey = process.env.NEXT_PUBLIC_TMDB_API_KEY;
+            if (!apiKey) {
+              console.error('[startSession] TMDB API key is missing');
+              socket.emit('sessionError', { message: 'TMDB API key is not configured' });
+              return;
+            }
 
-          const movies: Movie[] = movieData.results.slice(0, 20).map((tmdbMovie: any) => ({
-            id: tmdbMovie.id,
-            title: tmdbMovie.title,
-            year: parseInt(tmdbMovie.release_date?.split('-')[0] || "0"),
-            genre: tmdbMovie.genre_ids.map((id: number) => genresMap.get(id) || `ID ${id}`).slice(0, 3),
-            description: tmdbMovie.overview,
-            poster: tmdbMovie.poster_path ? `https://image.tmdb.org/t/p/w500${tmdbMovie.poster_path}` : "/placeholder-brain.png",
-          }));
+            const randomPage = Math.floor(Math.random() * 10) + 1; // 1-10
+            console.log(`[startSession] Fetching TMDB popular movies, page ${randomPage}`);
+            
+            const movieResponse = await fetch(`https://api.themoviedb.org/3/movie/popular?api_key=${apiKey}&language=de-DE&page=${randomPage}`);
+            if (!movieResponse.ok) {
+              throw new Error(`Movie API request failed: ${movieResponse.status}`);
+            }
+            const movieData = await movieResponse.json();
+            
+            const genreResponse = await fetch(`https://api.themoviedb.org/3/genre/movie/list?api_key=${apiKey}&language=de-DE`);
+            if (!genreResponse.ok) {
+              throw new Error(`Genre API request failed: ${genreResponse.status}`);
+            }
+            const genreData = await genreResponse.json();
+            
+            // Check if genres array exists
+            if (!genreData.genres || !Array.isArray(genreData.genres)) {
+              console.error('[startSession] Invalid genre data received:', genreData);
+              throw new Error('Invalid genre data received from TMDB');
+            }
+            
+            // Check if movies array exists
+            if (!movieData.results || !Array.isArray(movieData.results)) {
+              console.error('[startSession] Invalid movie data received:', movieData);
+              throw new Error('Invalid movie data received from TMDB');
+            }
 
-          room.movies = movies;
-          room.votes = {}; // Reset votes for new session
-          room.finishedUsers = []; // Reset finished users for new session
-          rooms.set(roomId, room);
+            const genresMap = new Map<number, string>(genreData.genres.map((g: any) => [g.id, g.name]));
 
-          io.to(roomId).emit('sessionStarted', { movies });
+            const movies: Movie[] = movieData.results.slice(0, 20).map((tmdbMovie: any) => ({
+              id: tmdbMovie.id,
+              title: tmdbMovie.title,
+              year: parseInt(tmdbMovie.release_date?.split('-')[0] || "0"),
+              genre: tmdbMovie.genre_ids.map((id: number) => genresMap.get(id) || `ID ${id}`).slice(0, 3),
+              description: tmdbMovie.overview,
+              poster: tmdbMovie.poster_path ? `https://image.tmdb.org/t/p/w500${tmdbMovie.poster_path}` : "/placeholder-brain.png",
+            }));
+
+            room.movies = movies;
+            room.votes = {}; // Reset votes for new session
+            room.finishedUsers = []; // Reset finished users for new session
+            rooms.set(roomId, room);
+
+            io.to(roomId).emit('sessionStarted', { movies });
+          } catch (error) {
+            console.error('[startSession] Error fetching movies:', error);
+            socket.emit('sessionError', { 
+              message: error instanceof Error ? error.message : 'Failed to fetch movies from TMDB' 
+            });
+          }
         }
       });
 
@@ -218,30 +252,64 @@ const SocketHandler = (req: NextApiRequest, res: NextApiResponseWithSocket) => {
       socket.on('restartSession', async ({ roomId }: { roomId: string }) => {
         const room = rooms.get(roomId);
         if (room && room.users[0].id === socket.id) {
-          const apiKey = process.env.NEXT_PUBLIC_TMDB_API_KEY;
-          const randomPage = Math.floor(Math.random() * 10) + 1; // 1-10
-          console.log(`[restartSession] Host ${socket.id} restarting session for room ${roomId}, page ${randomPage}`);
-          const movieResponse = await fetch(`https://api.themoviedb.org/3/movie/popular?api_key=${apiKey}&language=de-DE&page=${randomPage}`);
-          const movieData = await movieResponse.json();
-          const genreResponse = await fetch(`https://api.themoviedb.org/3/genre/movie/list?api_key=${apiKey}&language=de-DE`);
-          const genreData = await genreResponse.json();
-          const genresMap = new Map<number, string>(genreData.genres.map((g: any) => [g.id, g.name]));
+          try {
+            const apiKey = process.env.NEXT_PUBLIC_TMDB_API_KEY;
+            if (!apiKey) {
+              console.error('[restartSession] TMDB API key is missing');
+              socket.emit('sessionError', { message: 'TMDB API key is not configured' });
+              return;
+            }
 
-          const movies: Movie[] = movieData.results.slice(0, 20).map((tmdbMovie: any) => ({
-            id: tmdbMovie.id,
-            title: tmdbMovie.title,
-            year: parseInt(tmdbMovie.release_date?.split('-')[0] || "0"),
-            genre: tmdbMovie.genre_ids.map((id: number) => genresMap.get(id) || `ID ${id}`).slice(0, 3),
-            description: tmdbMovie.overview,
-            poster: tmdbMovie.poster_path ? `https://image.tmdb.org/t/p/w500${tmdbMovie.poster_path}` : "/placeholder-brain.png",
-          }));
+            const randomPage = Math.floor(Math.random() * 10) + 1; // 1-10
+            console.log(`[restartSession] Host ${socket.id} restarting session for room ${roomId}, page ${randomPage}`);
+            
+            const movieResponse = await fetch(`https://api.themoviedb.org/3/movie/popular?api_key=${apiKey}&language=de-DE&page=${randomPage}`);
+            if (!movieResponse.ok) {
+              throw new Error(`Movie API request failed: ${movieResponse.status}`);
+            }
+            const movieData = await movieResponse.json();
+            
+            const genreResponse = await fetch(`https://api.themoviedb.org/3/genre/movie/list?api_key=${apiKey}&language=de-DE`);
+            if (!genreResponse.ok) {
+              throw new Error(`Genre API request failed: ${genreResponse.status}`);
+            }
+            const genreData = await genreResponse.json();
 
-          room.movies = movies;
-          room.votes = {};
-          room.finishedUsers = [];
-          rooms.set(roomId, room);
+            // Check if genres array exists
+            if (!genreData.genres || !Array.isArray(genreData.genres)) {
+              console.error('[restartSession] Invalid genre data received:', genreData);
+              throw new Error('Invalid genre data received from TMDB');
+            }
+            
+            // Check if movies array exists
+            if (!movieData.results || !Array.isArray(movieData.results)) {
+              console.error('[restartSession] Invalid movie data received:', movieData);
+              throw new Error('Invalid movie data received from TMDB');
+            }
 
-          io.to(roomId).emit('sessionStarted', { movies });
+            const genresMap = new Map<number, string>(genreData.genres.map((g: any) => [g.id, g.name]));
+
+            const movies: Movie[] = movieData.results.slice(0, 20).map((tmdbMovie: any) => ({
+              id: tmdbMovie.id,
+              title: tmdbMovie.title,
+              year: parseInt(tmdbMovie.release_date?.split('-')[0] || "0"),
+              genre: tmdbMovie.genre_ids.map((id: number) => genresMap.get(id) || `ID ${id}`).slice(0, 3),
+              description: tmdbMovie.overview,
+              poster: tmdbMovie.poster_path ? `https://image.tmdb.org/t/p/w500${tmdbMovie.poster_path}` : "/placeholder-brain.png",
+            }));
+
+            room.movies = movies;
+            room.votes = {};
+            room.finishedUsers = [];
+            rooms.set(roomId, room);
+
+            io.to(roomId).emit('sessionStarted', { movies });
+          } catch (error) {
+            console.error('[restartSession] Error fetching movies:', error);
+            socket.emit('sessionError', { 
+              message: error instanceof Error ? error.message : 'Failed to fetch movies from TMDB' 
+            });
+          }
         }
       });
     });

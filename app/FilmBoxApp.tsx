@@ -3,9 +3,10 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import io from 'socket.io-client';
-import type { Socket } from 'socket.io-client';
 import Lobby from './Lobby'; // Import the Lobby component
 import Room from './Room';   // Import the Room component
+
+type SocketType = ReturnType<typeof io>;
 
 interface TmdbMovie {
   id: number;
@@ -74,7 +75,7 @@ const FilmBoxApp: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
 
   // Socket and Room State
-  const [socket, setSocket] = useState<Socket | null>(null);
+  const [socket, setSocket] = useState<SocketType | null>(null);
   const [roomId, setRoomId] = useState<string>('');
   const [roomUsers, setRoomUsers] = useState<RoomUser[]>([]);
   const [isInRoom, setIsInRoom] = useState<boolean>(false);
@@ -166,6 +167,12 @@ const FilmBoxApp: React.FC = () => {
       setMatchedMovies(matchedMovies);
       setShowResults(true);
       setWaitingForOthers(false);
+    });
+
+    newSocket.on('sessionError', ({ message }: { message: string }) => {
+      console.error('Session error:', message);
+      setError(`Session error: ${message}`);
+      setIsLoading(false);
     });
 
     newSocket.on('userJoined', (user: RoomUser) => {
